@@ -565,29 +565,53 @@ def render_timeline(campaign_name: str):
     st.plotly_chart(fig, use_container_width=True)
 
 def generate_pdf_report(campaign_data: dict, thresholds: dict) -> io.BytesIO:
-    product_name = campaign_data["name"]
+    campaign_name = campaign_data["name"]
     quadrant = campaign_data["quadrant"]
     scores = campaign_data["scores"] 
-    
+    strategy = campaign_data["strategy"]
+    ai_tactics = campaign_data.get("ai_tactics", "")
+
     pdf = FPDF("portrait", "mm", "letter")
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, txt="Political Strategy Report", ln=True, align="C")
+    pdf.cell(0, 10, txt="Political Strategy Matrix Report", ln=True, align="C")
     pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, txt="Campaign Information", ln=True)
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, txt=f"Candidate: {product_name}", ln=True)
-    pdf.cell(0, 10, txt=f"Quadrant: {quadrant}", ln=True)
-    pdf.cell(0, 10, txt=f"VR: {scores.voter_resonance} | PV: {scores.policy_viability}", ln=True)
-    pdf.cell(0, 10, txt=f"PI: {scores.public_integrity} | UE: {scores.urgency_electability}", ln=True)
-
-    # ROBUST FIX: Handle both fpdf (legacy) and fpdf2
-    try:
-        # Try legacy method (requires dest='S' to return bytes)
-        pdf_bytes = pdf.output(dest='S')
-    except TypeError:
-        # Fallback for fpdf2 (returns bytes by default)
-        pdf_bytes = pdf.output()
-        
+    pdf.cell(0, 10, txt=f"Candidate/Campaign: {campaign_name}", ln=True)
+    pdf.cell(0, 10, txt=f"Date: {datetime.today().strftime('%Y-%m-%d')}", ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, txt="Quadrant Classification", ln=True)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 10, txt=f"Current Quadrant: {quadrant}", ln=True)
+    score_text = (f"Scores: VR={scores.voter_resonance}, PV={scores.policy_viability}, PI={scores.public_integrity}, Momentum={scores.momentum}")
+    pdf.cell(0, 10, txt=score_text, ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, txt="Winning Strategy", ln=True)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 10, txt=f"Core Focus: {strategy.get('core_focus', 'N/A')}", ln=True)
+    pdf.cell(0, 10, txt="Recommended Actions:", ln=True)
+    for idx, action in enumerate(strategy.get("actions", [])):
+        pdf.cell(0, 10, txt=f"  {idx+1}. {action}", ln=True)
+    if ai_tactics:
+        pdf.ln(5)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, txt="AI-Enhanced Tactics", ln=True)
+        pdf.set_font("Arial", "", 10)
+        safe_text = ai_tactics.encode('latin-1', 'replace').decode('latin-1')
+        pdf.multi_cell(0, 8, txt=safe_text)
+    ops_strategy = get_field_strategy(quadrant)
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, txt="Field Operations", ln=True)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 10, txt=f"Event Type: {ops_strategy['event_type']}", ln=True)
+    pdf.cell(0, 10, txt=f"Volunteer Focus: {ops_strategy['volunteer_focus']}", ln=True)
+    pdf.cell(0, 10, txt=f"Rationale: {ops_strategy['rationale']}", ln=True)
+    pdf_bytes = pdf.output()
     return io.BytesIO(pdf_bytes)
     
 # ------------------------------
@@ -1183,9 +1207,12 @@ def main():
             for i, prod in enumerate(st.session_state.saved_campaigns):
                 with st.expander(f"{prod['name']} - {prod['quadrant']}"):
                     st.write(f"**Scores:** VR: {prod['scores'].voter_resonance} | PV: {prod['scores'].policy_viability} | PI: {prod['scores'].public_integrity}")
-                    if st.button("Download PDF Report", key=f"dl_{i}"):
-                        pdf_file = generate_pdf_report(prod, prod.get("thresholds", st.session_state.custom_thresholds))
-                        st.download_button(label="Click to Download", data=pdf_file, file_name=f"{prod['name']}_campaign_report.pdf", mime="application/pdf")
+                    if st.button(f"Download PDF for {prod['name']}", key=f"dl_{prod['name']}"):
+                    try:
+                        pdf_file = generate_pdf_report(prod, st.session_state.custom_thresholds)
+                        st.download_button("Download", data=pdf_file, file_name=f"{prod['name']}_report.pdf")
+                    except Exception as e:
+                        st.error(f"PDF Error: {e}")
 
 if __name__ == "__main__":
     main()
