@@ -143,7 +143,7 @@ def get_voter_targeting_strategy(quadrant: str) -> dict:
             "core_psychology": "Wants to back a winner. motivated by the inevitability of your victory.",
             "pain_points": ["Wasting a vote", "Being on the losing side", "Uncertainty"],
             "top_channels": ["Poll Announcements", "High-End Fundraisers", "Major Network Interviews"],
-            "messaging_angle": "Project inevitability. Show polling lead. 'Join the movement that is winning.'"
+            "messaging_angle": "Project inevitability. Show polling leads. 'Join the movement that is winning.'"
         },
         "Q6: The Agitator": {
             "persona_name": "The Protest Voter",
@@ -370,6 +370,9 @@ def generate_roadmap(current_quadrant: str, current_scores: NormalizedScores, ra
         "Momentum": t_scores["m"] - current_scores.momentum
     }
     
+    if not api_key:
+        return target, gaps, "⚠️ API Key required."
+        
     client = openai.OpenAI(api_key=api_key)
     prompt = f"""
     You are a campaign manager for a winning candidate. A candidate in the {race_type} race is currently in "{current_quadrant}".
@@ -611,8 +614,23 @@ def generate_pdf_report(campaign_data: dict, thresholds: dict) -> io.BytesIO:
     pdf.cell(0, 10, txt=f"Event Type: {ops_strategy['event_type']}", ln=True)
     pdf.cell(0, 10, txt=f"Volunteer Focus: {ops_strategy['volunteer_focus']}", ln=True)
     pdf.cell(0, 10, txt=f"Rationale: {ops_strategy['rationale']}", ln=True)
-    pdf_bytes = pdf.output()
+
+    # --- CORRECTED OUTPUT LOGIC START ---
+    try:
+        # Try standard output (works for fpdf2)
+        pdf_output = pdf.output()
+    except Exception:
+        # Fallback for older fpdf versions that require dest='S'
+        pdf_output = pdf.output(dest='S')
+
+    # Check if the result is a string (older versions) and encode it to bytes
+    if isinstance(pdf_output, str):
+        pdf_bytes = pdf_output.encode('latin-1')
+    else:
+        pdf_bytes = pdf_output
+        
     return io.BytesIO(pdf_bytes)
+    # --- CORRECTED OUTPUT LOGIC END ---
     
 # ------------------------------
 # Main Interactive Tabbed Interface
