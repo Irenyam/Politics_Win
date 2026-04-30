@@ -143,7 +143,7 @@ def get_voter_targeting_strategy(quadrant: str) -> dict:
             "core_psychology": "Wants to back a winner. motivated by the inevitability of your victory.",
             "pain_points": ["Wasting a vote", "Being on the losing side", "Uncertainty"],
             "top_channels": ["Poll Announcements", "High-End Fundraisers", "Major Network Interviews"],
-            "messaging_angle": "Project inevitability. Show polling leads. 'Join the movement that is winning.'"
+            "messaging_angle": "Project inevitability. Show polling lead. 'Join the movement that is winning.'"
         },
         "Q6: The Agitator": {
             "persona_name": "The Protest Voter",
@@ -1208,11 +1208,11 @@ def main():
                 with st.expander(f"{prod['name']} - {prod['quadrant']}"):
                     st.write(f"**Scores:** VR: {prod['scores'].voter_resonance} | PV: {prod['scores'].policy_viability} | PI: {prod['scores'].public_integrity}")
                     if st.button(f"Download PDF for {prod['name']}", key=f"dl_{prod['name']}"):
-                    try:
-                        pdf_file = generate_pdf_report(prod, st.session_state.custom_thresholds)
-                        st.download_button("Download", data=pdf_file, file_name=f"{prod['name']}_report.pdf")
-                    except Exception as e:
-                        st.error(f"PDF Error: {e}")
+                        try:
+                            pdf_file = generate_pdf_report(prod, st.session_state.custom_thresholds)
+                            st.download_button("Download", data=pdf_file, file_name=f"{prod['name']}_report.pdf")
+                        except Exception as e:
+                            st.error(f"PDF Error: {e}")
 
 if __name__ == "__main__":
     main()
