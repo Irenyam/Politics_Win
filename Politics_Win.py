@@ -567,12 +567,18 @@ def render_timeline(campaign_name: str):
     fig = px.line(df, x='date', y=['vr', 'pv', 'pi', 'momentum'], title=f"Campaign Momentum Timeline: {campaign_name}", labels={"value": "Score", "variable": "Metric"})
     st.plotly_chart(fig, use_container_width=True)
 
+def clean_text(text):
+    """Helper to force text to Latin-1 compatible encoding to prevent PDF errors."""
+    if not text: return ""
+    # Encode to latin-1, replacing errors with '?' to ensure compatibility
+    return text.encode('latin-1', 'replace').decode('latin-1')
+
 def generate_pdf_report(campaign_data: dict, thresholds: dict) -> io.BytesIO:
-    campaign_name = campaign_data["name"]
-    quadrant = campaign_data["quadrant"]
+    campaign_name = clean_text(campaign_data["name"])
+    quadrant = clean_text(campaign_data["quadrant"])
     scores = campaign_data["scores"] 
     strategy = campaign_data["strategy"]
-    ai_tactics = campaign_data.get("ai_tactics", "")
+    ai_tactics = clean_text(campaign_data.get("ai_tactics", ""))
 
     pdf = FPDF("portrait", "mm", "letter")
     pdf.add_page()
@@ -589,48 +595,54 @@ def generate_pdf_report(campaign_data: dict, thresholds: dict) -> io.BytesIO:
     pdf.cell(0, 10, txt="Quadrant Classification", ln=True)
     pdf.set_font("Arial", "", 12)
     pdf.cell(0, 10, txt=f"Current Quadrant: {quadrant}", ln=True)
+    
+    # Handle score formatting safely
     score_text = (f"Scores: VR={scores.voter_resonance}, PV={scores.policy_viability}, PI={scores.public_integrity}, Momentum={scores.momentum}")
     pdf.cell(0, 10, txt=score_text, ln=True)
+    
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 10, txt="Winning Strategy", ln=True)
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, txt=f"Core Focus: {strategy.get('core_focus', 'N/A')}", ln=True)
+    pdf.cell(0, 10, txt=f"Core Focus: {clean_text(strategy.get('core_focus', 'N/A'))}", ln=True)
     pdf.cell(0, 10, txt="Recommended Actions:", ln=True)
     for idx, action in enumerate(strategy.get("actions", [])):
-        pdf.cell(0, 10, txt=f"  {idx+1}. {action}", ln=True)
+        pdf.cell(0, 10, txt=f"  {idx+1}. {clean_text(action)}", ln=True)
+        
     if ai_tactics:
         pdf.ln(5)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 10, txt="AI-Enhanced Tactics", ln=True)
         pdf.set_font("Arial", "", 10)
-        safe_text = ai_tactics.encode('latin-1', 'replace').decode('latin-1')
-        pdf.multi_cell(0, 8, txt=safe_text)
+        pdf.multi_cell(0, 8, txt=ai_tactics)
+        
     ops_strategy = get_field_strategy(quadrant)
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 10, txt="Field Operations", ln=True)
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, txt=f"Event Type: {ops_strategy['event_type']}", ln=True)
-    pdf.cell(0, 10, txt=f"Volunteer Focus: {ops_strategy['volunteer_focus']}", ln=True)
-    pdf.cell(0, 10, txt=f"Rationale: {ops_strategy['rationale']}", ln=True)
+    pdf.cell(0, 10, txt=f"Event Type: {clean_text(ops_strategy['event_type'])}", ln=True)
+    pdf.cell(0, 10, txt=f"Volunteer Focus: {clean_text(ops_strategy['volunteer_focus'])}", ln=True)
+    pdf.cell(0, 10, txt=f"Rationale: {clean_text(ops_strategy['rationale'])}", ln=True)
 
-    # --- CORRECTED OUTPUT LOGIC START ---
+    # --- ROBUST OUTPUT LOGIC ---
+    # Prioritize dest='S' for older FPDF versions
     try:
-        # Try standard output (works for fpdf2)
-        pdf_output = pdf.output()
-    except Exception:
-        # Fallback for older fpdf versions that require dest='S'
         pdf_output = pdf.output(dest='S')
+    except TypeError:
+        # Fallback for newer fpdf2 versions where dest might be deprecated/changed
+        pdf_output = pdf.output()
 
-    # Check if the result is a string (older versions) and encode it to bytes
-    if isinstance(pdf_output, str):
+    # Handle string vs bytes return types
+    if isinstance(pdf_output, bytes):
+        pdf_bytes = pdf_output
+    elif isinstance(pdf_output, str):
         pdf_bytes = pdf_output.encode('latin-1')
     else:
-        pdf_bytes = pdf_output
-        
+        # If it's None or something else, return empty bytes to avoid crash
+        pdf_bytes = b''
+
     return io.BytesIO(pdf_bytes)
-    # --- CORRECTED OUTPUT LOGIC END ---
     
 # ------------------------------
 # Main Interactive Tabbed Interface
